@@ -1,15 +1,3 @@
-<p align="center">
-  <a href="https://github.com/ton-projet" target="_blank">
-    <img src="https://ton-image-url.com/logo.png" width="400" alt="AyShop Logo">
-  </a>
-</p>
-
-<p align="center">
-  <a href="https://github.com/ton-projet/actions"><img src="https://github.com/ton-projet/workflows/tests/badge.svg" alt="Build Status"></a>
-  <a href="https://packagist.org/packages/ton-projet"><img src="https://img.shields.io/packagist/dt/ton-projet" alt="Total Downloads"></a>
-  <a href="https://packagist.org/packages/ton-projet"><img src="https://img.shields.io/packagist/v/ton-projet" alt="Latest Stable Version"></a>
-  <a href="https://packagist.org/packages/ton-projet"><img src="https://img.shields.io/packagist/l/ton-projet" alt="License"></a>
-</p>
 
 # 🛒 AyShop – Backend API
 
