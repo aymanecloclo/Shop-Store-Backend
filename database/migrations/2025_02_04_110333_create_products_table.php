@@ -21,7 +21,7 @@ return new class extends Migration
         $table->string('size')->nullable();
         $table->string('operatingSystem')->nullable();
         $table->string('brand')->nullable();
-        $table->integer('stock_quantity');
+        $table->integer('stock_quantity')->nullable();
         $table->unsignedBigInteger('imgId');  
         $table->timestamps();
         });

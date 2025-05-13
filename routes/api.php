@@ -11,7 +11,7 @@ use Illuminate\Http\Request;
 
 /**
  * Routes publiques (Accessibles sans authentification)
- */
+ */ 
 Route::get('/products', [ProductController::class, 'index']); // Liste des produits
 Route::get('/products/{id}', [ProductController::class, 'show']); // Détails d'un produit
 Route::get('/categories', [CategoryController::class, 'index']); // Liste des catégories
@@ -34,7 +34,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Gestion du panier (Cart)
     Route::get('/cart', [CartController::class, 'index']); // Voir le panier
-    Route::post('/cart/add', [CartController::class, 'add']); // Ajouter au panier
+    Route::post('/cart/sync', [CartController::class, 'add']); // Ajouter au panier
     Route::put('/cart/update/{id}', [CartController::class, 'update']); // Mettre à jour le panier
     Route::delete('/cart/remove/{id}', [CartController::class, 'remove']); // Supprimer un produit du panier
 
@@ -46,7 +46,4 @@ Route::middleware('auth:sanctum')->group(function () {
     // // Paiements (Payment)
     // Route::post('/payments', [PaymentController::class, 'processPayment']); // Effectuer un paiement
     // Route::get('/payments/{order_id}', [PaymentController::class, 'getPaymentStatus']); // Statut d'un paiement
-});
-Route::get('/hello', function () {
-    return response()->json(['message' => 'Hello from Laravel 🐘']);
 });

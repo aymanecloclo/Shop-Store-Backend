@@ -10,6 +10,7 @@ return Application::configure(basePath: dirname(__DIR__))
         api: __DIR__ . '/../routes/api.php', // Ajout du fichier api.php
         commands: __DIR__ . '/../routes/console.php',
         health: '/up',
+    
     )
     ->withMiddleware(function (Middleware $middleware) {
         // $middleware->statefulApi();
