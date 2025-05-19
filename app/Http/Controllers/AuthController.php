@@ -13,29 +13,64 @@ class AuthController extends Controller
 {
     public function syncAuth0User(Request $request)
     {
-        $validated = $request->validate([
-            'email' => 'required|email',
-            'name' => 'sometimes|string|max:255',
-            'password' => 'sometimes|string|min:8' // Champ optionnel
-        ]);
-
-        $userData = [
-            'name' => $validated['name'] ?? 'Auth0 User',
-            'password' => isset($validated['password'])
-                ? Hash::make($validated['password'])
-                : Hash::make(Str::random(32)) // Mot de passe aléatoire si non fourni
-        ];
-
-        $user = User::firstOrCreate(
-            ['email' => $validated['email']],
-            $userData
-        );
-
-        return response()->json([
-            'user_id' => $user->id,
-            'wasRecentlyCreated' => $user->wasRecentlyCreated,
-            'auth_method' => isset($validated['password']) ? 'standard' : 'auth0'
-        ]);
+        // 1. Vérification du token Auth0
+        $authHeader = $request->header('Authorization');
+        
+        if (!$authHeader || !str_starts_with($authHeader, 'Bearer ')) {
+            return response()->json(['message' => 'Token Auth0 manquant'], 401);
+        }
+    
+        $token = substr($authHeader, 7);
+    
+        try {
+            // 2. Décodage et validation du token JWT
+            $auth0Domain = 'dev-7aofz21k0iyppwar.us.auth0.com';
+            $jwksUrl = "https://{$auth0Domain}/.well-known/jwks.json";
+            $jwks = Http::get($jwksUrl)->json();
+            $decoded = JWT::decode($token, JWK::parseKeySet($jwks));
+    
+            // 3. Extraction des claims importants
+            $auth0Id = $decoded->sub;
+            $email = $decoded->email ?? null;
+            $name = $decoded->name ?? $decoded->nickname ?? 'Auth0 User';
+    
+            if (!$email) {
+                return response()->json(['message' => 'Email manquant dans le token Auth0'], 400);
+            }
+    
+            // 4. Synchronisation de l'utilisateur
+            $user = User::updateOrCreate(
+                ['auth0_id' => $auth0Id], // Recherche par auth0_id d'abord
+                [
+                    'email' => $email,
+                    'name' => $name,
+                    'password' => Hash::make(Str::random(32)) // Mot de passe aléatoire sécurisé
+                ]
+            );
+    
+            // 5. Authentification de l'utilisateur
+            auth()->login($user);
+    
+            // 6. Création d'un token Sanctum pour les requêtes suivantes
+            $sanctumToken = $user->createToken('auth0-sanctum-token')->plainTextToken;
+    
+            return response()->json([
+                'user' => [
+                    'id' => $user->id,
+                    'name' => $user->name,
+                    'email' => $user->email,
+                    'auth0_id' => $user->auth0_id
+                ],
+                'token' => $sanctumToken,
+                'auth_method' => 'auth0'
+            ]);
+    
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => 'Échec de la synchronisation Auth0',
+                'error' => $e->getMessage()
+            ], 401);
+        }
     }
     // Inscription
     public function register(Request $request)

@@ -1,4 +1,7 @@
 <?php
+namespace App\Http\Controllers;
+
+
 
 namespace App\Http\Controllers;
 
@@ -7,172 +10,235 @@ use App\Models\Product;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\DB;
+use App\Models\Cart;
 
 class CartController extends Controller
 {
-    /**
-     * Récupère le panier de l'utilisateur
-     */
-    public function index()
+    public function getCart()
     {
-        $cartItems = Auth::user()
-            ->cartItems()
-            ->with('product') // Charge les relations produit
-            ->get();
+        $user = Auth::user();
+        
+        if (!$user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized'
+            ], 401);
+        }
 
-        return response()->json([
-            'success' => true,
-            'cart' => $cartItems->map(function ($item) {
-                return [
-                    'id' => $item->product_id,
-                    'quantity' => $item->quantity,
-                    'price' => $item->product->price,
-                    'name' => $item->product->name,
-                    'image' => $item->product->image_url,
-                    // Ajoutez d'autres champs nécessaires
-                ];
-            })
-        ]);
+        try {
+            $cart = Cart::with(['items.product'])
+                ->firstOrCreate(
+                    ['user_id' => $user->id],
+                    ['total' => 0, 'status' => 'active']
+                );
+
+            return response()->json([
+                'success' => true,
+                'cart' => [
+                    'items' => $cart->items->map(function ($item) {
+                        return [
+                            'id' => $item->product_id,
+                            'product_id' => $item->product_id,
+                            'quantity' => $item->quantity,
+                            'price' => $item->price,
+                            'product' => $item->product ? [
+                                'name' => $item->product->name,
+                                'imgId' => $item->product->imgId,
+                                // Add other product fields as needed
+                            ] : null
+                        ];
+                    }),
+                    'total' => $cart->total
+                ]
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to fetch cart',
+                'error' => $e->getMessage()
+            ], 500);
+        }
     }
 
-    /**
-     * Synchronise le panier complet
-     */
     public function sync(Request $request)
     {
+        $user = Auth::user();
+        
+        if (!$user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized'
+            ], 401);
+        }
+
         $validator = Validator::make($request->all(), [
-            'cartItems' => 'required|array',
-            'cartItems.*.product_id' => 'required|exists:products,id',
-            'cartItems.*.quantity' => 'required|integer|min:1',
+            'items' => 'required|array',
+            'items.*.product_id' => 'required|exists:products,id',
+            'items.*.quantity' => 'required|integer|min:1|max:100',
+            'items.*.price' => 'required|numeric|min:0'
         ]);
 
         if ($validator->fails()) {
             return response()->json([
                 'success' => false,
+                'message' => 'Validation failed',
                 'errors' => $validator->errors()
             ], 422);
         }
 
-        // Supprime les anciens items
-        Auth::user()->cartItems()->delete();
+        try {
+            DB::beginTransaction();
+            
+            $cart = Cart::firstOrCreate(['user_id' => $user->id]);
+            $cart->items()->delete();
+            
+            $total = 0;
+            $syncedItems = [];
+            
+            foreach ($request->items as $item) {
+                $product = Product::find($item['product_id']);
+                
+                if (!$product) {
+                    throw new \Exception("Product {$item['product_id']} not found");
+                }
+                
+                $cartItem = $cart->items()->create([
+                    'product_id' => $item['product_id'],
+                    'quantity' => $item['quantity'],
+                    'price' => $item['price']
+                ]);
+                
+                $total += $item['price'] * $item['quantity'];
+                
+                $syncedItems[] = [
+                    'id' => $cartItem->product_id,
+                    'product_id' => $cartItem->product_id,
+                    'quantity' => $cartItem->quantity,
+                    'price' => $cartItem->price,
+                    'product' => [
+                        'name' => $product->name,
+                        'imgId' => $product->imgId,
+                        // Add other product fields as needed
+                    ]
+                ];
+            }
+            
+            $cart->total = $total;
+            $cart->save();
+            
+            DB::commit();
 
-        // Ajoute les nouveaux items
-        foreach ($request->cartItems as $item) {
-            Auth::user()->cartItems()->create([
-                'product_id' => $item['product_id'],
-                'quantity' => $item['quantity'],
+            return response()->json([
+                'success' => true,
+                'message' => 'Cart synced successfully',
+                'cart' => [
+                    'items' => $syncedItems,
+                    'total' => $total
+                ]
             ]);
-        }
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Cart synchronized successfully'
-        ]);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            \Log::error('Cart sync failed: ' . $e->getMessage());
+            
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to sync cart',
+                'error' => $e->getMessage()
+            ], 500);
+        }
     }
 
-    /**
-     * Ajoute un produit au panier
-     */
-    public function add(Request $request)
+    public function mergeCarts(Request $request)
     {
+        $user = Auth::user();
+        
+        if (!$user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized'
+            ], 401);
+        }
+
         $validator = Validator::make($request->all(), [
-            'product_id' => 'required|exists:products,id',
-            'quantity' => 'required|integer|min:1',
+            'localItems' => 'required|array',
+            'localItems.*.id' => 'required|exists:products,id',
+            'localItems.*.quantity' => 'required|integer|min:1|max:100',
+            'localItems.*.price' => 'required|numeric|min:0'
         ]);
 
         if ($validator->fails()) {
             return response()->json([
                 'success' => false,
+                'message' => 'Validation failed',
                 'errors' => $validator->errors()
             ], 422);
         }
 
-        $cartItem = Auth::user()->cartItems()
-            ->where('product_id', $request->product_id)
-            ->first();
+        try {
+            DB::beginTransaction();
+            
+            $cart = Cart::firstOrCreate(['user_id' => $user->id]);
+            $currentProductIds = $cart->items->pluck('product_id')->toArray();
+            
+            $total = $cart->total;
+            $mergedItems = $cart->items->toArray();
+            
+            foreach ($request->localItems as $item) {
+                if (!in_array($item['id'], $currentProductIds)) {
+                    $product = Product::find($item['id']);
+                    
+                    if (!$product) {
+                        continue;
+                    }
+                    
+                    $cartItem = $cart->items()->create([
+                        'product_id' => $item['id'],
+                        'quantity' => $item['quantity'],
+                        'price' => $item['price']
+                    ]);
+                    
+                    $total += $item['price'] * $item['quantity'];
+                    
+                    $mergedItems[] = [
+                        'id' => $cartItem->product_id,
+                        'product_id' => $cartItem->product_id,
+                        'quantity' => $cartItem->quantity,
+                        'price' => $cartItem->price,
+                        'product' => [
+                            'name' => $product->name,
+                            'imgId' => $product->imgId,
+                            // Add other product fields as needed
+                        ]
+                    ];
+                }
+            }
+            
+            $cart->total = $total;
+            $cart->save();
+            
+            DB::commit();
 
-        if ($cartItem) {
-            // Met à jour la quantité si le produit existe déjà
-            $cartItem->increment('quantity', $request->quantity);
-        } else {
-            // Crée un nouvel item
-            Auth::user()->cartItems()->create([
-                'product_id' => $request->product_id,
-                'quantity' => $request->quantity,
+            return response()->json([
+                'success' => true,
+                'message' => 'Carts merged successfully',
+                'cart' => [
+                    'items' => $mergedItems,
+                    'total' => $total
+                ]
             ]);
-        }
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Product added to cart'
-        ]);
-    }
-
-    /**
-     * Met à jour la quantité d'un produit
-     */
-    public function update(Request $request, $productId)
-    {
-        $validator = Validator::make($request->all(), [
-            'quantity' => 'required|integer|min:1',
-        ]);
-
-        if ($validator->fails()) {
+        } catch (\Exception $e) {
+            DB::rollBack();
+            \Log::error('Cart merge failed: ' . $e->getMessage());
+            
             return response()->json([
                 'success' => false,
-                'errors' => $validator->errors()
-            ], 422);
+                'message' => 'Failed to merge carts',
+                'error' => $e->getMessage()
+            ], 500);
         }
-
-        $updated = Auth::user()->cartItems()
-            ->where('product_id', $productId)
-            ->update(['quantity' => $request->quantity]);
-
-        if (!$updated) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Product not found in cart'
-            ], 404);
-        }
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Cart updated successfully'
-        ]);
-    }
-
-    /**
-     * Supprime un produit du panier
-     */
-    public function remove($productId)
-    {
-        $deleted = Auth::user()->cartItems()
-            ->where('product_id', $productId)
-            ->delete();
-
-        if (!$deleted) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Product not found in cart'
-            ], 404);
-        }
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Product removed from cart'
-        ]);
-    }
-
-    /**
-     * Vide complètement le panier
-     */
-    public function clear()
-    {
-        Auth::user()->cartItems()->delete();
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Cart cleared successfully'
-        ]);
     }
 }

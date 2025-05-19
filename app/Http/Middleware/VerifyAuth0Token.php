@@ -22,7 +22,7 @@ class VerifyAuth0Token
         $token = substr($authHeader, 7);
 
         try {
-            $auth0Domain = env('AUTH0_DOMAIN');
+            $auth0Domain ='dev-7aofz21k0iyppwar.us.auth0.com';
             $jwksUrl = "https://{$auth0Domain}/.well-known/jwks.json";
             $jwks = Http::get($jwksUrl)->json();
             $decoded = JWT::decode($token, JWK::parseKeySet($jwks));

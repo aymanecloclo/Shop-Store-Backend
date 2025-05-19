@@ -22,7 +22,7 @@ return new class extends Migration
         $table->string('operatingSystem')->nullable();
         $table->string('brand')->nullable();
         $table->integer('stock_quantity')->nullable();
-        $table->unsignedBigInteger('imgId');  
+        $table->string('imgId');
         $table->timestamps();
         });
     }
