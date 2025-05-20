@@ -74,7 +74,7 @@ class CartController extends Controller
         }
 
         $validator = Validator::make($request->all(), [
-            'items' => 'required|array',
+            'items' => '|array',
             'items.*.product_id' => 'required|exists:products,id',
             'items.*.quantity' => 'required|integer|min:1|max:100',
             'items.*.price' => 'required|numeric|min:0'
@@ -115,13 +115,11 @@ class CartController extends Controller
                 $syncedItems[] = [
                     'id' => $cartItem->product_id,
                     'product_id' => $cartItem->product_id,
-                    'quantity' => $cartItem->quantity,
+                     'quantity' => $cartItem->quantity,
                     'price' => $cartItem->price,
-                    'product' => [
-                        'name' => $product->name,
-                        'imgId' => $product->imgId,
-                        // Add other product fields as needed
-                    ]
+                    'name' => $product->name,
+                    'imgId' => $product->imgId,
+               
                 ];
             }
             
