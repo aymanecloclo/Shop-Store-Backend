@@ -14,11 +14,19 @@ return new class extends Migration
         Schema::create('payments', function (Blueprint $table) {
             $table->id();
             $table->foreignId('order_id')->constrained('orders')->onDelete('cascade');
-            $table->dateTime('payment_date')->useCurrent(); // Définit automatiquement la date par défaut
+            $table->string('stripe_payment_intent_id')->nullable();
+            $table->string('stripe_session_id');
             $table->decimal('amount', 10, 2);
-            $table->enum('payment_method', ['card', 'paypal', 'cash']);
-            $table->enum('status', ['successful', 'pending', 'failed'])->default('pending'); // Ajout d'une valeur par défaut
+            $table->string('currency')->default('mad');
+            $table->string('status')->default('pending');
+            $table->string('payment_method')->nullable();
+            $table->json('metadata')->nullable();
+            $table->timestamp('paid_at')->nullable();
             $table->timestamps();
+
+            $table->index('stripe_session_id');
+            $table->index('stripe_payment_intent_id');
+        
         });
     }
 

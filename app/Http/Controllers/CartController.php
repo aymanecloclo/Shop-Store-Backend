@@ -12,6 +12,10 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\DB;
 use App\Models\Cart;
+use App\Models\user;
+use App\Models\Payment;
+
+use App\Models\Order;
 
 class CartController extends Controller
 {
@@ -239,4 +243,5 @@ class CartController extends Controller
             ], 500);
         }
     }
+   
 }

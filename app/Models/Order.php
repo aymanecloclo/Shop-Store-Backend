@@ -11,9 +11,13 @@ class Order extends Model
 
     protected $fillable = [
         'user_id',
-        'order_date',
+        'total',
         'status',
-        'total_price',
+        'stripe_session_id'
+    ];
+    
+    protected $casts = [
+        'items' => 'array'
     ];
 
     /**

@@ -12,12 +12,13 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('orders', function (Blueprint $table) {
-           $table->id();
-        $table->foreignId('user_id')->constrained()->onDelete('cascade');
-        $table->dateTime('order_date');
-        $table->enum('status', ['pending', 'shipped', 'delivered', 'cancelled']);
-        $table->decimal('total_price', 10, 2);
-        $table->timestamps();
+            $table->id();
+            $table->unsignedBigInteger('user_id');
+            $table->decimal('total', 10, 2);
+            $table->string('status')->default('pending');
+            $table->string('stripe_session_id')->nullable();
+            $table->timestamps(); // Ceci ajoute created_at et updated_at
+            $table->foreign('user_id')->references('id')->on('users');
         });
     }
 
