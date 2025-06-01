@@ -13,7 +13,7 @@ use App\Models\Product;
 use App\Models\OrderDetail;
 use App\Models\Payment;
 // use App\Models\Notifications\OrderConfirmation;
-use Illuminate\Support\Facades\DB; 
+use Illuminate\Support\Facades\DB;
 
 
 
