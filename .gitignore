@@ -6,6 +6,8 @@
 # /storage/*.key
 # /storage/pail
 /vendor
+# .gitignore
+.env
 
 # .env.backup
 # .env.production
